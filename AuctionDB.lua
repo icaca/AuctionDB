@@ -115,23 +115,27 @@ local startTime
 local function Query(name)
     if IsAtAuctionHouse() then
         -- name = ""
-        minLevel = nil
-        maxLevel = nil
-        invTypeIndex = 0
-        classIndex = 0
-        subclassIndex = 0
-        isUsable = 0
-        qualityIndex = 0
+        local minLevel = nil
+        local maxLevel = nil
+        local invTypeIndex = 0
+        local classIndex = 0
+        local subclassIndex = 0
+        local isUsable = 0
+        local qualityIndex = 0
+        local newItems = 0
+        local page = 0
+        local getAll, exactMatch
         if name == "" then
             getAll = true
+            exactMatch = false
         else
             getAll = false
+            exactMatch = true
         end
-        newItems = 0
-        page = 0
+
         QueryAuctionItems(name, minLevel, maxLevel,
             invTypeIndex, classIndex, subclassIndex,
-            page, isUsable, qualityIndex, getAll
+            page, isUsable, qualityIndex, getAll, exactMatch
         )
     end
 end
@@ -142,10 +146,10 @@ function AsDebug(msg)
     end
 end
 
-SnipList = {}
+SnipList, DBScan, DBTemp, inProgress = {}, {}, {}, {}
 
 function ExtractLink(text)
-    return string.match(text, [[|H([^:]*):([^|]*)|h([^|]*)|h]]);
+    return string.match(text, [[|Hitem:%d+:([^:]*):([^|]*)|h([^|]*)|h]]);
 end
 
 function GetItemString(link)
@@ -153,59 +157,114 @@ function GetItemString(link)
     return select(11, strsplit(":", raw, 11))
 end
 
-local function ProsessScan()
-    local DBScan, DBTemp = {}, {}
+function ProsessScan()
+    DBScan, DBTemp, inProgress = {}, {}, {}
     local newItems, timeUsed, endTime, query, prosessed
     newItems = 0
     batch, listCount = GetNumAuctionItems("list");
     prosessed = 0
     LastScan = time()
+    -- print(listCount)
     for i = 1, listCount do
         local name, texture, count, quality, canUse, level, levelColHeader, minBid,
         minIncrement, buyoutPrice, bidAmount, highBidder, bidderFullName, owner,
         ownerFullName, saleStatus, itemID, hasAllInfo = GetAuctionItemInfo("list", i)
+
         local link = GetAuctionItemLink("list", i)
-        
+
+        local vendorPrice = nil
+        if AuctionDB.ItemList[itemID] ~= nil then
+            vendorPrice = AuctionDB.ItemList[itemID].VendorPrice
+        else
+            vendorPrice = select(11, GetItemInfo(itemID))
+            if name and vendorPrice then
+                AuctionDB["ItemList"][itemID] = { ["Name"] = name, ["VendorPrice"] = vendorPrice }
+            end
+        end
+
         if buyoutPrice and itemID and quality and type(quality) == "number" and count > 0 and buyoutPrice > 0 and
             itemID > 0 and link then
-            -- AsDebug(itemID .. ": " .. buyoutPrice)
-            local vendorPrice = select(11, GetItemInfo(link))
-            local name        = GetItemInfo(itemID)
-            local price       = buyoutPrice / count
-            if vendorPrice > price then
-                print(name, vendorPrice, price)
+
+            local price = buyoutPrice / count
+            if vendorPrice and vendorPrice - price > 100 and price > 0 then
+                print(name, vendorPrice, price, owner)
                 table.insert(SnipList, name)
             end
-            AuctionDB["ItemList"][itemID] = name
-            local itemLevel = GetDetailedItemLevelInfo(link)
+
             DBScan[i] = { ["Price"] = price, ["Amount"] = count, ["ItemID"] = itemID,
-                ["Level"] = itemLevel,
                 ["ItemLink"] = link, ["Quality"] = quality }
+        else
+            local item = Item:CreateFromItemID(itemID)
+            inProgress[item] = true
+
+            item:ContinueOnItemLoad(function()
+
+                local name, texture, count, quality, canUse, level, levelColHeader, minBid,
+                minIncrement, buyoutPrice, bidAmount, highBidder, bidderFullName, owner,
+                ownerFullName, saleStatus, itemID, hasAllInfo = GetAuctionItemInfo("list", i)
+                link                                          = GetAuctionItemLink("list", i)
+                inProgress[item]                              = nil
+
+                if vendorPrice == nil then
+                    if AuctionDB.ItemList[itemID] ~= nil then
+                        vendorPrice = AuctionDB.ItemList[itemID].VendorPrice
+                    else
+                        vendorPrice = select(11, GetItemInfo(itemID))
+                        if name and vendorPrice then
+                            AuctionDB["ItemList"][itemID] = { ["Name"] = name, ["VendorPrice"] = vendorPrice }
+                        end
+                    end
+                end
+
+                local price = buyoutPrice / count
+                if vendorPrice and vendorPrice - price > 100 and price > 0 then
+                    print(name, vendorPrice, price, owner)
+                    table.insert(SnipList, name)
+                end
+
+                DBScan[i] = { ["Price"] = price, ["Amount"] = count, ["ItemID"] = itemID,
+                    ["ItemLink"] = link, ["Quality"] = quality }
+                if not next(inProgress) then
+                    inProgress = {}
+                    EndScan()
+                end
+            end)
         end
+
         prosessed = prosessed + 1
+        -- Delay(.001)
     end
 
-    print(#DBScan)
+    if not next(inProgress) then
+        EndScan()
+    end
+    -- print(#DBScan)
 
+
+end
+
+function EndScan()
     for _, offer in pairs(DBScan) do
-        -- print(offer)
         if offer.Quality > 0 then
-            local variant
-            link = select(2, ExtractLink(offer.ItemLink))
-            variant = string.gsub(link, tostring(offer.ItemID), "")
-            print(offer.ItemID,variant)
-            if DBTemp[offer.ItemID] == nil then
-                DBTemp[offer.ItemID] = {}
+            local ItemID = offer.ItemID
+
+            local variant = select(2, ExtractLink(offer.ItemLink))
+            -- local variant = string.gsub(link, tostring(ItemID), "")
+            -- print(variant)
+            -- print(ItemID, variant)
+            if DBTemp[ItemID] == nil then
+                DBTemp[ItemID] = {}
             end
-            if DBTemp[offer.ItemID][variant] == nil then
-                DBTemp[offer.ItemID][variant] = {}
+            if DBTemp[ItemID][variant] == nil then
+                DBTemp[ItemID][variant] = {}
             end
-            table.insert(DBTemp[offer.ItemID][variant], offer)
-            print(DBTemp)
+            table.insert(DBTemp[ItemID][variant], offer)
+            -- print(DBTemp[ItemID])
         end
     end
 
-    print(#DBTemp)
+    -- print(#DBTemp)
+
     for itemID, _ in pairs(DBTemp) do
         if AuctionDB["ASItemList"][Server][itemID] == nil then
             AuctionDB["ASItemList"][Server][itemID] = {}
@@ -219,20 +278,13 @@ local function ProsessScan()
             }
         end
     end
-    print(#AuctionDB)
+    -- print(#AuctionDB)
 
     endTime = time()
 
-    timeUsed = endTime - startTime
-    timeUsed = math.floor(timeUsed * 100) / 100
     AuctionDB["ASLastScan"] = endTime
-    batch, listCount = GetNumAuctionItems("list");
-    if not newItems == 0 then
-        newItems = newItems .. " / "
-    else
-        newItems = ""
-    end
-    Pwc("扫描结束: " .. newItems .. listCount .. " 件商品，耗时 " .. timeUsed .. " 秒")
+
+    Pwc("扫描结束: " .. listCount .. " 件商品")
     isScaning = false
 end
 
@@ -318,4 +370,121 @@ function AsSnip()
     print("狙击！")
     buttonB:Disable()
     -- QueryAuctionItems('', nil, nil, snippage, false, 0, nil, false, nil)
+end
+
+---core
+
+
+AsInit()
+AsDebugActive = true
+
+ASWaitingForAh = false
+ASAuctionHouseWindowOpen = false
+AuctionDB = _G.AuctionDB
+
+
+if AuctionDB == nil then
+    AuctionDB = {}
+    AuctionDB["ASItemList"] = {}
+    AuctionDB["ASItemList"][Server] = {}
+end
+if AuctionDB["ASItemList"] == nil then
+    AuctionDB["ASItemList"] = {}
+    AuctionDB["ASItemList"][Server] = {}
+end
+if AuctionDB["ASItemList"][Server] == nil then
+    AuctionDB["ASItemList"][Server] = {}
+end
+if AuctionDB["ItemList"] == nil then
+    AuctionDB["ItemList"] = {}
+end
+
+if AuctionDB["ASLastScan"] == nil then
+    AuctionDB["ASLastScan"] = GetTime()
+end
+
+
+
+
+--- event
+
+local function MyAddonCommands(msg, editbox)
+    -- pattern matching that skips leading whitespace and whitespace between cmd and args
+    -- any whitespace at end of args is retained
+    local _, _, cmd, args = string.find(msg, "%s?(%w+)%s?(.*)")
+    if cmd == "scan" then
+        AsScan()
+    end
+end
+
+SLASH_AUCTIONSCAN1 = '/as'
+
+SlashCmdList["AUCTIONSCAN"] = MyAddonCommands
+
+local AhClosed = "AUCTION_HOUSE_CLOSED"
+local AhOpened = "AUCTION_HOUSE_SHOW"
+snip_timer, curr = nil, nil
+function OnEvent(self, event, msg, from, ...)
+    if (event == AhClosed) then
+        ASAuctionHouseWindowOpen = false
+        snip_timer:Cancel()
+    end
+    if (event == AhOpened) then
+        ASAuctionHouseWindowOpen = true
+        buttonA = ScanButton()
+        buttonB = SnipButton()
+        buttonB:Disable()
+        snip_timer = C_Timer.NewTicker(
+            1,
+            function()
+                if not isScaning then
+                    -- print('狙击列表剩余：', #SnipList)
+                    if SnipList and #SnipList > 0 and curr == nil then
+                        print(SnipList[0])
+                        curr = SnipList[0]
+                        SnipList[0] = nil
+                        Query("")
+                        buttonB:Enable()
+
+                    else
+                    end
+
+
+                end
+
+            end
+        )
+    end
+
+end
+
+local f = CreateFrame("Frame")
+f:RegisterEvent(AhClosed)
+f:RegisterEvent(AhOpened)
+f:SetScript("OnEvent", OnEvent)
+
+
+
+-- ui
+
+function ScanButton()
+    local b = CreateFrame("Button", "AsScanButton", AuctionFrameBrowse, "UIPanelButtonTemplate")
+    b:SetSize(75, 22) -- width, height
+    b:SetText("扫描")
+    b:SetPoint("BOTTOMLEFT", 25, 43);
+    b:SetScript("OnClick", function()
+        AsScan()
+    end)
+    return b
+end
+
+function SnipButton()
+    local b = CreateFrame("Button", "AsSnipButton", AuctionFrameBrowse, "UIPanelButtonTemplate")
+    b:SetSize(75, 22) -- width, height
+    b:SetText("狙击")
+    b:SetPoint("BOTTOMLEFT", 110, 43);
+    b:SetScript("OnClick", function()
+        AsSnip()
+    end)
+    return b
 end

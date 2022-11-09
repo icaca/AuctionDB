@@ -4,7 +4,4 @@
 ## Notes: Scan the auction house for item prices 
 ## SavedVariables: AuctionDB
 
-Functions.lua
-Core.lua
-EventHandler.lua
-Ui.lua
+AuctionDB.lua
