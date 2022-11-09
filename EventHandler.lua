@@ -9,31 +9,43 @@ end
 
 SLASH_AUCTIONSCAN1 = '/as'
 
-SlashCmdList["AUCTIONSCAN"] = MyAddonCommands  
+SlashCmdList["AUCTIONSCAN"] = MyAddonCommands
 
 local AhClosed = "AUCTION_HOUSE_CLOSED"
 local AhOpened = "AUCTION_HOUSE_SHOW"
-local MerchantOpened = "MERCHANT_SHOW"
-
+snip_timer = nil
 function OnEvent(self, event, msg, from, ...)
-    if(event == AhClosed) then
+    if (event == AhClosed) then
         ASAuctionHouseWindowOpen = false
+        snip_timer:Cancel()
     end
-    if(event == AhOpened) then
+    if (event == AhOpened) then
         ASAuctionHouseWindowOpen = true
-        ScanButton()
+        buttonA = ScanButton()
+        buttonB = SnipButton()
+        buttonB:Disable()
+        snip_timer = C_Timer.NewTicker(
+            1,
+            function()
+                if not isScaning then
+                    -- print('狙击列表剩余：', #SnipList)
+                    if SnipList and #SnipList > 0 then
+                        -- print(SnipList[0])
+                        -- local curr = SnipList[0]
+                        -- SnipList[0] = nil
+                    else
+                    end
+
+                    buttonB:Enable()
+                end
+
+            end
+        )
     end
-    if(event == MerchantOpened) then
-        AsDebug("Merchant open")
-        AsUpdateVendorList()
-    end
+
 end
-
-
-
 
 local f = CreateFrame("Frame")
 f:RegisterEvent(AhClosed)
 f:RegisterEvent(AhOpened)
-f:RegisterEvent(MerchantOpened)
 f:SetScript("OnEvent", OnEvent)

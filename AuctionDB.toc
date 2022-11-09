@@ -2,7 +2,7 @@
 ## Title: AuctionDB
 ## Version: 1.0.1
 ## Notes: Scan the auction house for item prices 
-## SavedVariables: ASItemList, ASLastScan, AsVendorList
+## SavedVariables: AuctionDB
 
 Functions.lua
 Core.lua
