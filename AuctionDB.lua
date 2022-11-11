@@ -1,6 +1,6 @@
 ASAuctionHouseWindowOpen = false
 RealmString = GetRealmName()
-buttonA, buttonB = nil, nil
+-- buttonA, buttonB = nil, nil
 isScaning = false
 FactionGroup = string.sub(select(1, UnitFactionGroup('player')), 1, 1)
 Server = RealmString .. '-' .. FactionGroup
@@ -8,6 +8,11 @@ table.clone = table.clone or function(t)
     local result = {}
     for i = 1, #t do result[i] = t[i] end
     return result
+end
+
+SLASH_ADB_Commands1 = "/ahdb"
+SlashCmdList["ADB_Commands"] = function(msg)
+    AsScan()
 end
 
 local function AsGetMinBuyoutPrice(itemID)
@@ -111,32 +116,33 @@ local function IsAtAuctionHouse()
     return false
 end
 
-local startTime
-local function Query(name)
+-- function Query(name, page)
+--     if IsAtAuctionHouse() then
+--         local minLevel = nil
+--         local maxLevel = nil
+--         local isUsable = 0
+--         local qualityIndex = 0
+--         local getAll = false
+--         local exactMatch = true
+
+--         QueryAuctionItems(name, minLevel, maxLevel,
+--             page, isUsable, qualityIndex, getAll, exactMatch)
+--     end
+-- end
+
+function QueryAll()
     if IsAtAuctionHouse() then
-        -- name = ""
+        local name = ""
         local minLevel = nil
         local maxLevel = nil
-        local invTypeIndex = 0
-        local classIndex = 0
-        local subclassIndex = 0
         local isUsable = 0
         local qualityIndex = 0
-        local newItems = 0
         local page = 0
-        local getAll, exactMatch
-        if name == "" then
-            getAll = true
-            exactMatch = false
-        else
-            getAll = false
-            exactMatch = true
-        end
+        local getAll = true
+        local exactMatch = false
 
         QueryAuctionItems(name, minLevel, maxLevel,
-            invTypeIndex, classIndex, subclassIndex,
-            page, isUsable, qualityIndex, getAll, exactMatch
-        )
+            page, isUsable, qualityIndex, getAll, exactMatch)
     end
 end
 
@@ -159,12 +165,11 @@ end
 
 function ProsessScan()
     DBScan, DBTemp, inProgress = {}, {}, {}
-    local newItems, timeUsed, endTime, query, prosessed
-    newItems = 0
-    batch, listCount = GetNumAuctionItems("list");
+    local prosessed
+
+    local batch, listCount = GetNumAuctionItems("list");
     prosessed = 0
     LastScan = time()
-    -- print(listCount)
     for i = 1, listCount do
         local name, texture, count, quality, canUse, level, levelColHeader, minBid,
         minIncrement, buyoutPrice, bidAmount, highBidder, bidderFullName, owner,
@@ -187,7 +192,7 @@ function ProsessScan()
 
             local price = buyoutPrice / count
             if vendorPrice and vendorPrice - price > 100 and price > 0 then
-                print(name, vendorPrice, price, owner)
+                print(name, vendorPrice, price)
                 table.insert(SnipList, name)
             end
 
@@ -218,7 +223,7 @@ function ProsessScan()
 
                 local price = buyoutPrice / count
                 if vendorPrice and vendorPrice - price > 100 and price > 0 then
-                    print(name, vendorPrice, price, owner)
+                    print(name, vendorPrice, price)
                     table.insert(SnipList, name)
                 end
 
@@ -238,8 +243,6 @@ function ProsessScan()
     if not next(inProgress) then
         EndScan()
     end
-    -- print(#DBScan)
-
 
 end
 
@@ -284,8 +287,10 @@ function EndScan()
 
     AuctionDB["ASLastScan"] = endTime
 
-    Pwc("扫描结束: " .. listCount .. " 件商品")
     isScaning = false
+    Pwc("扫描结束")
+
+    -- buttonA:Enable()
 end
 
 function analyze(data, his, date)
@@ -354,23 +359,43 @@ end
 
 function AsScan()
     if IsAtAuctionHouse() and CanQuery() then
-        snipping = true
-        startTime = time()
-        if ASItemList == nil then
-            Pwc("运行首次扫描")
-        else
-            Pwc("开始扫描")
-        end
-        Query("")
+        Pwc("扫描开始")
+        -- buttonB:Disable()
+        QueryAll()
         C_Timer.After(1, ProsessScan)
     end
 end
 
-function AsSnip()
-    print("狙击！")
-    buttonB:Disable()
-    -- QueryAuctionItems('', nil, nil, snippage, false, 0, nil, false, nil)
-end
+-- function AsSnip()
+--     -- print("狙击！")
+--     buttonB:Disable()
+--     local batch, listCount = GetNumAuctionItems("list");
+--     -- print(batch, listCount)
+--     for i = 1, listCount do
+--         local name, texture, count, quality, canUse, level, levelColHeader, minBid,
+--         minIncrement, buyoutPrice, bidAmount, highBidder, bidderFullName, owner,
+--         ownerFullName, saleStatus, itemID, hasAllInfo = GetAuctionItemInfo("list", i)
+
+--         local link = GetAuctionItemLink("list", i)
+
+--         local vendorPrice = nil
+--         if AuctionDB.ItemList[itemID] ~= nil then
+--             vendorPrice = AuctionDB.ItemList[itemID].VendorPrice
+--         else
+--             vendorPrice = select(11, GetItemInfo(itemID))
+--             if name and vendorPrice then
+--                 AuctionDB["ItemList"][itemID] = { ["Name"] = name, ["VendorPrice"] = vendorPrice }
+--             end
+--         end
+--         local price = buyoutPrice / count
+--         if vendorPrice and vendorPrice - price > 100 and price > 0 then
+--             print(name, vendorPrice, price)
+
+--             PlaceAuctionBid("list", i, buyoutPrice)
+--             return
+--         end
+--     end
+-- end
 
 ---core
 
@@ -423,37 +448,50 @@ SlashCmdList["AUCTIONSCAN"] = MyAddonCommands
 
 local AhClosed = "AUCTION_HOUSE_CLOSED"
 local AhOpened = "AUCTION_HOUSE_SHOW"
-snip_timer, curr = nil, nil
+-- snip_timer, PAGE = nil, 1
+-- local IDX = 1
 function OnEvent(self, event, msg, from, ...)
     if (event == AhClosed) then
         ASAuctionHouseWindowOpen = false
-        snip_timer:Cancel()
+        -- snip_timer:Cancel()
     end
     if (event == AhOpened) then
         ASAuctionHouseWindowOpen = true
-        buttonA = ScanButton()
-        buttonB = SnipButton()
-        buttonB:Disable()
-        snip_timer = C_Timer.NewTicker(
-            1,
-            function()
-                if not isScaning then
-                    -- print('狙击列表剩余：', #SnipList)
-                    if SnipList and #SnipList > 0 and curr == nil then
-                        print(SnipList[0])
-                        curr = SnipList[0]
-                        SnipList[0] = nil
-                        Query("")
-                        buttonB:Enable()
+        -- buttonA = ScanButton()
+        -- buttonB = SnipButton()
+        -- buttonC = StartButton()
+        -- buttonB:Disable()
 
-                    else
-                    end
+        -- snip_timer = C_Timer.NewTicker(
+        --     1,
+        --     function()
+        --         if not isScaning then
+        --             -- print('狙击列表剩余：', #SnipList)
+        --             if SnipList and #SnipList > 0 and curr == nil then
+        --                 print(SnipList[0])
+        --                 local curr = SnipList[0]
+        --                 SnipList[0] = nil
+        --                 Query(curr)
+        --                 PAGE = max(ceil(select(2, GetNumAuctionItems("list")) / NUM_AUCTION_ITEMS_PER_PAGE) - 1, 0)
+        --                 -- buttonB:Enable()
+        --             else
+        --                 -- print(PAGE)
+
+        --                 for key, value in pairs(Snip) do
+        --                     local itemName, itemLink = GetItemInfo(key)
+
+        --                     Query(itemName, 1)
+        --                     print(itemName, value)
+
+        --                     -- buttonB:Enable()
+        --                 end
+        --             end
 
 
-                end
+        --         end
 
-            end
-        )
+        --     end
+        -- )
     end
 
 end
@@ -463,28 +501,46 @@ f:RegisterEvent(AhClosed)
 f:RegisterEvent(AhOpened)
 f:SetScript("OnEvent", OnEvent)
 
-
-
 -- ui
 
-function ScanButton()
-    local b = CreateFrame("Button", "AsScanButton", AuctionFrameBrowse, "UIPanelButtonTemplate")
-    b:SetSize(75, 22) -- width, height
-    b:SetText("扫描")
-    b:SetPoint("BOTTOMLEFT", 25, 43);
-    b:SetScript("OnClick", function()
-        AsScan()
-    end)
-    return b
-end
+-- function ScanButton()
+--     local b = CreateFrame("Button", "AsScanButton", AuctionFrameBrowse, "UIPanelButtonTemplate")
+--     b:SetSize(55, 22) -- width, height
+--     b:SetText("扫描")
+--     b:SetPoint("BOTTOMLEFT", 65, 43);
+--     b:SetScript("OnClick", function()
+--         AsScan()
+--     end)
+--     return b
+-- end
 
-function SnipButton()
-    local b = CreateFrame("Button", "AsSnipButton", AuctionFrameBrowse, "UIPanelButtonTemplate")
-    b:SetSize(75, 22) -- width, height
-    b:SetText("狙击")
-    b:SetPoint("BOTTOMLEFT", 110, 43);
-    b:SetScript("OnClick", function()
-        AsSnip()
-    end)
-    return b
-end
+-- function SnipButton()
+--     local b = CreateFrame("Button", "AsSnipButton", AuctionFrameBrowse, "UIPanelButtonTemplate")
+--     b:SetSize(1, 1) -- width, height
+--     b:SetText("")
+--     b:SetPoint("BOTTOMLEFT", 1, 1);
+--     b:SetScript("OnClick", function()
+--         AsSnip()
+--     end)
+--     return b
+-- end
+
+-- StartFlag = false
+-- function StartButton()
+--     local b = CreateFrame("Button", "StartButton", AuctionFrameBrowse, "UIPanelButtonTemplate")
+--     b:SetSize(55, 22) -- width, height
+--     b:SetText("自动")
+--     b:SetPoint("BOTTOMLEFT", 5, 43);
+--     b:SetScript("OnClick", function()
+--         if StartFlag then
+--             b:SetText("自动")
+--             buttonA:Enable()
+--             StartFlag = not StartFlag
+--         else
+--             b:SetText("停止")
+--             buttonA:Disable()
+--             StartFlag = not StartFlag
+--         end
+--     end)
+--     return b
+-- end
