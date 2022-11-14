@@ -2,7 +2,9 @@
 ## Title: AuctionDB
 ## Version: 1.0.1
 ## Notes: Scan the auction house for item prices 
-## SavedVariables: AuctionDB
+## SavedVariables: AHDB
 
-DB.lua
+# DB.lua
 AuctionDB.lua
+# TSMHelper.lua
+# AppData.lua

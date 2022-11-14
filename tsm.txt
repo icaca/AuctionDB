@@ -1,0 +1,38 @@
+/tsm sources
+TSM: 以下是可用价格源列表，并对它们代表的含义附有简短的描述
+TSM:
+  Destroy (分解价值)
+  ItemLevel (物品等级)
+  ItemQuality (物品品质)
+  NumInventory (总库存)
+  RequiredLevel (所需人物等级)
+  VendorBuy (从NPC购买)
+  VendorSell (卖给NPC)
+Accounting:
+  AvgBuy (平均买入价)
+  AvgSell (平均卖出价)
+  MaxBuy (最高买入价)
+  MaxSell (最高卖价)
+  MinBuy (最低买入价)
+  MinSell (最低卖价)
+  NumExpires (自上次销售起过期)
+  SaleRate (成交率)
+  SmartAvgBuy (智能平均买入价)
+AuctionDB:
+  DBHistorical (拍卖数据库-历史价格(来自TSM应用))
+  DBMarket (拍卖数据库-市场价格)
+  DBMinBuyout (拍卖数据库-最低一口价)
+  DBRegionHistorical (拍卖数据库-区域历史价格(来自TSM应用))
+  DBRegionMarketAvg (拍卖数据库-区域市场平均价格(来自TSM应用))
+  DBRegionSaleAvg (拍卖数据库-区域平均销售价(来自TSM应用))
+  DBRegionSaleRate (拍卖数据库-区域成交率(来自TSM应用))
+  DBRegionSoldPerDay (拍卖数据库-区域每日成交量(来自TSM应用))
+Crafting:
+  Crafting (制造成本)
+  MatPrice (制造材料成本)
+Operations:
+  auctioningopmax (首次拍卖最高价)
+  auctioningopmin (首次拍卖最低价)
+  auctioningopnormal (首次拍卖正常价)
+  shoppingopmax (购买操作最高限价)
+  sniperopmax (狙击操作低于价格)
