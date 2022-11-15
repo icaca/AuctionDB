@@ -143,7 +143,7 @@ function Query(name, page)
         local qualityIndex = 0
         local getAll = false
         local exactMatch = false
-
+        SortAuctionClearSort("list")
         QueryAuctionItems(name, minLevel, maxLevel,
             page, isUsable, qualityIndex, getAll, exactMatch)
     end
@@ -349,7 +349,7 @@ function AsScan()
 end
 
 function AsSnip()
-    print("狙击！")
+    -- print("狙击！")
     -- buttonB:Disable()
     local batch, listCount = GetNumAuctionItems("list");
 
@@ -365,7 +365,7 @@ function AsSnip()
 
         local price = buyoutPrice / count
 
-        if vendorPrice and vendorPrice - price > 1 and price > 0 then
+        if vendorPrice and vendorPrice - price >= 0 and price > 0 then
             print(i, name, buyoutPrice, vendorPrice)
             PlaceAuctionBid("list", i, buyoutPrice)
             return
@@ -389,21 +389,26 @@ end
 SLASH_AUCTIONSCAN1 = '/as'
 
 SlashCmdList["AUCTIONSCAN"] = MyAddonCommands
-
+local Inited = false
 local AhClosed = "AUCTION_HOUSE_CLOSED"
 local AhOpened = "AUCTION_HOUSE_SHOW"
 local snip_timer, PAGE = nil, 1
 function OnEvent(self, event, msg, from, ...)
     if (event == AhClosed) then
+        if Inited == false then
+            Inited = true
+        end
         ASAuctionHouseWindowOpen = false
+
         snip_timer:Cancel()
     end
     if (event == AhOpened) then
         ASAuctionHouseWindowOpen = true
-        buttonA = ScanButton()
-        buttonB = SnipButton()
-        buttonC = StartButton()
-
+        if not Inited then
+            buttonA = ScanButton()
+            buttonB = SnipButton()
+            buttonC = StartButton()
+        end
         snip_timer = C_Timer.NewTicker(
             1,
             function()
