@@ -4,7 +4,7 @@
 ## Notes: Scan the auction house for item prices 
 ## SavedVariables: AHDB
 
-# DB.lua
+DB.lua
 AuctionDB.lua
 # TSMHelper.lua
 # AppData.lua

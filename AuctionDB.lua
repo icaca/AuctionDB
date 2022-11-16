@@ -198,6 +198,7 @@ function ProsessScan()
         local link = GetAuctionItemLink("list", i)
 
         local vendorPrice = AsGetVendorSellPrice(itemID)
+        -- print(name, vendorPrice, owner)
 
         if buyoutPrice and itemID and quality and type(quality) == "number" and count > 0 and buyoutPrice > 0 and
             itemID > 0 and link then
@@ -255,14 +256,15 @@ function EndScan()
     end
 
     for itemID, _ in pairs(DBTemp) do
-        if AHDB[Server][itemID] == nil then
-            AHDB[Server][itemID] = {}
-        end
-
         local price, amount, minBuyout = analyze(DBTemp[itemID])
-        AHDB[Server][itemID] = { ["Price"] = price, ["Amount"] = amount, ["MinBuyout"] = minBuyout,
-            ["LastSeen"] = LastScan,
-        }
+        if amount > 3 then
+            if AHDB[Server][itemID] == nil then
+                AHDB[Server][itemID] = {}
+            end
+            AHDB[Server][itemID] = { ["Price"] = price, ["Amount"] = amount, ["MinBuyout"] = minBuyout,
+                ["LastSeen"] = LastScan,
+            }
+        end
     end
 
     endTime = time()
@@ -292,9 +294,6 @@ function analyze(data)
     local t, Count = {}, 0
 
     for _, item in pairs(data) do
-        if Count == 0 then
-            minprice = item.Price
-        end
         if Count >= Min30 then
             break
         end
@@ -322,11 +321,14 @@ function analyze(data)
     end
     b = (b / Min30) ^ 0.5 --总体标准偏差
     -- print(4,b,#t)
-    local sum, count, c = 0, 0, nil
+    local sum, count, c, minprice = 0, 0, nil, nil
     for k, item in pairs(t) do --归一化,范围-1.5 —— 1.5 之间
         v = item.Price
         c = (v - avg) / b
         if c >= -1.5 and c <= 1.5 then
+            if minprice == nil or minprice < item.Amount then
+                minprice = item.Amount
+            end
             sum = sum + v * item.Amount
             count = count + item.Amount
             -- print(5,k,v,c,b,item.Amount)
@@ -335,7 +337,7 @@ function analyze(data)
     -- print(6,sum/count,count,time(),Amount)
     -- _his = table.clone(his)
     -- table.insert(_his, { ["Price"] = math.floor(sum / count), ["Amount"] = Amount, ["LastSeen"] = date })
-    return math.floor(sum / count), Amount, minprice
+    return math.floor(sum / count), count, minprice
     -- return calcMarketPriceByMultipleVals(_his),Amount
 end
 
@@ -354,21 +356,32 @@ function AsSnip()
     local batch, listCount = GetNumAuctionItems("list");
 
     -- print(batch, listCount)
-    for i = 1, batch do
+    -- for i = #list, 1, -1 do
+    for i = batch, 1, -1 do
         local name, texture, count, quality, canUse, level, levelColHeader, minBid,
         minIncrement, buyoutPrice, bidAmount, highBidder, bidderFullName, owner,
         ownerFullName, saleStatus, itemID, hasAllInfo = GetAuctionItemInfo("list", i)
         -- local link = GetAuctionItemLink("list", i)
 
-        local vendorPrice = AsGetVendorSellPrice(itemID)
         -- print(i, name, buyoutPrice, vendorPrice)
+        -- local price = buyoutPrice / count
+        if buyoutPrice and buyoutPrice > 0 then
+            local snipprice = DB.SNIP[itemID]
+            if snipprice and snipprice > 0 then
+                snipprice = snipprice * count * 10000
+                if snipprice and snipprice - buyoutPrice >= 0 then
+                    print(i, name, buyoutPrice, vendorPrice)
+                    PlaceAuctionBid("list", i, buyoutPrice)
+                    return
+                end
+            end
 
-        local price = buyoutPrice / count
-
-        if vendorPrice and vendorPrice - price >= 0 and price > 0 then
-            print(i, name, buyoutPrice, vendorPrice)
-            PlaceAuctionBid("list", i, buyoutPrice)
-            return
+            local vendorPrice = AsGetVendorSellPrice(itemID) * count
+            if vendorPrice and vendorPrice - buyoutPrice >= 0 then
+                print(i, name, buyoutPrice, vendorPrice)
+                PlaceAuctionBid("list", i, buyoutPrice)
+                return
+            end
         end
     end
 end
@@ -409,8 +422,9 @@ function OnEvent(self, event, msg, from, ...)
             buttonB = SnipButton()
             buttonC = StartButton()
         end
+        buttonB:Disable()
         snip_timer = C_Timer.NewTicker(
-            1,
+            .3,
             function()
                 if StartFlag and not ASWaitingForAh then
                     PAGE = max(ceil(select(2, GetNumAuctionItems("list")) / NUM_AUCTION_ITEMS_PER_PAGE) - 1, 0)
@@ -451,7 +465,7 @@ function SnipButton()
 end
 
 function StartButton()
-    local b = CreateFrame("Button", "StartButton", AuctionFrameBrowse, "UIPanelButtonTemplate")
+    local b = CreateFrame("Button", "AsStartButton", AuctionFrameBrowse, "UIPanelButtonTemplate")
     b:SetSize(55, 22) -- width, height
     b:SetText("自动")
     b:SetPoint("BOTTOMLEFT", 10, 43);
@@ -459,10 +473,12 @@ function StartButton()
         if StartFlag then
             b:SetText("自动")
             buttonA:Enable()
+            buttonB:Disable()
             StartFlag = not StartFlag
         else
             b:SetText("停止")
             buttonA:Disable()
+            buttonB:Enable()
             StartFlag = not StartFlag
         end
     end)
