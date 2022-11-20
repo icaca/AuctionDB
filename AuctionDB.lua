@@ -43,7 +43,7 @@ function AsGetVendorSellPrice(itemId)
     if sellprice then
         return sellprice
     end
-    return false
+    return 0
 end
 
 local function Pwc(msg)
@@ -326,8 +326,8 @@ function analyze(data)
         v = item.Price
         c = (v - avg) / b
         if c >= -1.5 and c <= 1.5 then
-            if minprice == nil or minprice < item.Amount then
-                minprice = item.Amount
+            if minprice == nil or minprice < v then
+                minprice = v
             end
             sum = sum + v * item.Amount
             count = count + item.Amount
@@ -361,7 +361,7 @@ function AsSnip()
         local name, texture, count, quality, canUse, level, levelColHeader, minBid,
         minIncrement, buyoutPrice, bidAmount, highBidder, bidderFullName, owner,
         ownerFullName, saleStatus, itemID, hasAllInfo = GetAuctionItemInfo("list", i)
-        -- local link = GetAuctionItemLink("list", i)
+
 
         -- print(i, name, buyoutPrice, vendorPrice)
         -- local price = buyoutPrice / count
@@ -369,16 +369,18 @@ function AsSnip()
             local snipprice = DB.SNIP[itemID]
             if snipprice and snipprice > 0 then
                 snipprice = snipprice * count * 10000
+                local link = GetAuctionItemLink("list", i)
                 if snipprice and snipprice - buyoutPrice >= 0 then
-                    print(i, name, buyoutPrice, vendorPrice)
+                    print("狙击: ", link, name, buyoutPrice / 10000, snipprice / 10000)
                     PlaceAuctionBid("list", i, buyoutPrice)
                     return
                 end
             end
 
             local vendorPrice = AsGetVendorSellPrice(itemID) * count
-            if vendorPrice and vendorPrice - buyoutPrice >= 0 then
-                print(i, name, buyoutPrice, vendorPrice)
+            if vendorPrice and vendorPrice - buyoutPrice >= 100 then
+                local link = GetAuctionItemLink("list", i)
+                print("卖店: ", link, name, buyoutPrice / 10000, vendorPrice / 10000)
                 PlaceAuctionBid("list", i, buyoutPrice)
                 return
             end
