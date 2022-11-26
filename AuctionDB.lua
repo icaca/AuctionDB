@@ -67,62 +67,62 @@ function AsInit()
     Pwc("Loaded Auction v1.0.3")
 end
 
-local function FormatTime(time)
-    local weeks = ""
-    local months = ""
-    local days = ""
-    local hours = ""
-    local minutes = ""
-    local secounds = ""
-    if time > 604800 then
-        weeks = math.floor(time / 604800)
-        time = time - weeks * 604800
-        if weeks == 1 then
-            weeks = weeks .. "week and "
-        else
-            weeks = weeks .. "weeks and "
-        end
-    end
-    if time > 86400 then
-        days = math.floor(time / 86400)
-        time = time - days * 86400
+-- local function FormatTime(time)
+--     local weeks = ""
+--     local months = ""
+--     local days = ""
+--     local hours = ""
+--     local minutes = ""
+--     local secounds = ""
+--     if time > 604800 then
+--         weeks = math.floor(time / 604800)
+--         time = time - weeks * 604800
+--         if weeks == 1 then
+--             weeks = weeks .. "week and "
+--         else
+--             weeks = weeks .. "weeks and "
+--         end
+--     end
+--     if time > 86400 then
+--         days = math.floor(time / 86400)
+--         time = time - days * 86400
 
-        if days == 1 then
-            days = days .. " day "
-        else
-            days = days .. " days "
-        end
-    end
-    if weeks == "" then
-        if time > 3600 then
-            hours = math.floor(time / 3600)
-            time = time - hours * 3600
-            hours = hours .. "h "
-        end
-        if time > 59 then
-            minutes = math.floor(time / 60)
-            time = time - minutes * 60
-            minutes = minutes .. "m "
-        end
-        if time < 60 then
-            secounds = math.floor(time) .. "s"
-        end
-    end
-    return weeks .. days .. hours .. minutes .. secounds
-end
+--         if days == 1 then
+--             days = days .. " day "
+--         else
+--             days = days .. " days "
+--         end
+--     end
+--     if weeks == "" then
+--         if time > 3600 then
+--             hours = math.floor(time / 3600)
+--             time = time - hours * 3600
+--             hours = hours .. "h "
+--         end
+--         if time > 59 then
+--             minutes = math.floor(time / 60)
+--             time = time - minutes * 60
+--             minutes = minutes .. "m "
+--         end
+--         if time < 60 then
+--             secounds = math.floor(time) .. "s"
+--         end
+--     end
+--     return weeks .. days .. hours .. minutes .. secounds
+-- end
 
 local function CanQuery()
-    canQuery, canQueryAll = CanSendAuctionQuery()
+    local canQuery, canQueryAll = CanSendAuctionQuery()
     if (canQueryAll) then
         return true
     end
-    theTime = time()
-    if AHDB["ASLastScan"] == nil then
-        AHDB["ASLastScan"] = theTime
+    local theTime = time()
+    if AHDB["LastScan"] == nil then
+        AHDB["LastScan"] = theTime
     end
 
-    timeLeft = AHDB["ASLastScan"] + (15 * 60) - theTime
-    timeLeft = FormatTime(timeLeft)
+    local timeLeft = AHDB["LastScan"] + (15 * 60) - theTime
+    -- timeLeft = FormatTime(timeLeft)
     Pwc("查询接口冷却剩余, " .. timeLeft .. " ")
     return false
 end
@@ -189,7 +189,7 @@ function ProsessScan()
 
     local batch, listCount = GetNumAuctionItems("list");
 
-    LastScan = time()
+    -- LastScan = time()
     for i = 1, listCount do
         local name, texture, count, quality, canUse, level, levelColHeader, minBid,
         minIncrement, buyoutPrice, bidAmount, highBidder, bidderFullName, owner,
@@ -238,6 +238,7 @@ function ProsessScan()
 end
 
 function EndScan()
+    endTime = time()
     for _, offer in pairs(DBScan) do
         if offer.Quality > 0 then
             local ItemID = offer.ItemID
@@ -262,12 +263,12 @@ function EndScan()
                 AHDB[Server][itemID] = {}
             end
             AHDB[Server][itemID] = { ["Price"] = price, ["Amount"] = amount, ["MinBuyout"] = minBuyout,
-                ["LastSeen"] = LastScan,
-            }
+                ["LastSeen"] = endTime }
+        else
+            AHDB[Server][itemID].LastSeen = endTime
         end
     end
 
-    endTime = time()
     AHDB["LastScan"] = endTime
     ASWaitingForAh = false
     Pwc("扫描结束")
@@ -326,7 +327,7 @@ function analyze(data)
         v = item.Price
         c = (v - avg) / b
         if c >= -1.5 and c <= 1.5 then
-            if minprice == nil or minprice < v then
+            if minprice == nil or minprice > v then
                 minprice = v
             end
             sum = sum + v * item.Amount
